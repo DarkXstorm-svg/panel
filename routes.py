@@ -218,21 +218,43 @@ def device_action():
         flash(f'Device {device_id} deleted.', 'info')
         
     elif action == 'extend':
-        if device.approved:
+        if not device.approved:
+            flash(f'Cannot extend device {device_id}. Device must be approved first.', 'error')
+            return redirect(url_for('devices'))
+        
+        try:
             extension_days = int(request.form.get('extension_days', 30))
-            old_expiration = device.expiration_date
-            
-            if device.expiration_date and device.expiration_date > date.today():
-                device.expiration_date = device.expiration_date + timedelta(days=extension_days)
-            else:
-                device.expiration_date = date.today() + timedelta(days=extension_days)
-            
-            expiration_change = f'Extended from {old_expiration} to {device.expiration_date}'
-            log_device_action(device_id, 'extended', 'Approved', 'Approved', 
-                             expiration_change, username)
-            flash(f'Device {device_id} extended until {device.expiration_date}.', 'success')
+            if extension_days < 1 or extension_days > 365:
+                flash('Extension days must be between 1 and 365.', 'error')
+                return redirect(url_for('devices'))
+        except (ValueError, TypeError):
+            flash('Invalid extension days value.', 'error')
+            return redirect(url_for('devices'))
+        
+        old_expiration = device.expiration_date
+        
+        # Extend from current expiration if it's still in the future, otherwise from today
+        if device.expiration_date and device.expiration_date > date.today():
+            device.expiration_date = device.expiration_date + timedelta(days=extension_days)
+        else:
+            device.expiration_date = date.today() + timedelta(days=extension_days)
+        
+        expiration_change = f'Extended from {old_expiration} to {device.expiration_date}'
+        log_device_action(device_id, 'extended', 'Approved', 'Approved', 
+                         expiration_change, username)
+        
+        # Add notification for admins
+        add_notification(None, f'Device {device_id} extended by {username} until {device.expiration_date}.', 'info')
+        
+        flash(f'Device {device_id} extended successfully until {device.expiration_date}.', 'success')
     
-    db.session.commit()
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error processing device action: {str(e)}', 'error')
+        return redirect(url_for('devices'))
+    
     return redirect(url_for('devices'))
 
 @app.route('/users')

@@ -28,11 +28,11 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
 # Initialize the app with the extension
 db.init_app(app)
 
-# Import models and routes within the app context
-# This ensures 'db' is fully initialized before models are defined
+# Import routes after app creation to avoid circular imports
 with app.app_context():
     # Import models to ensure tables are created
     import models  # noqa: F401
+    import routes  # noqa: F401
     
     # Create all tables
     db.create_all()
@@ -40,6 +40,3 @@ with app.app_context():
     # Initialize default admin user and settings
     from utils import initialize_default_data
     initialize_default_data()
-    
-    # Import routes after models and db setup
-    import routes  # noqa: F401
