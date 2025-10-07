@@ -223,5 +223,4 @@ document.addEventListener('visibilitychange', function() {
 // Start auto-refresh on dashboard pages
 if (window.location.pathname === '/' || window.location.pathname.includes('dashboard')) {
     startAutoRefresh();
-        }
-  
+}
