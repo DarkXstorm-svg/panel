@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1><i class="fas fa-mobile-alt"></i> Device Management</h1>
+        </div>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <form method="GET" class="row g-3">
+                    <div class="col-md-4">
+                        <label for="status" class="form-label">Status Filter</label>
+                        <select class="form-select" id="status" name="status">
+                            <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All Devices</option>
+                            <option value="approved" {% if status_filter == 'approved' %}selected{% endif %}>Approved</option>
+                            <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>Pending</option>
+                            <option value="expired" {% if status_filter == 'expired' %}selected{% endif %}>Expired</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="search" class="form-label">Search</label>
+                        <input type="text" class="form-control" id="search" name="search" 
+                               placeholder="Device ID or Username" value="{{ search }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">&nbsp;</label>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-filter"></i> Apply Filters
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Devices Table -->
+<div class="row">
+    <div class="col-12">
+        <div class="card shadow">
+            <div class="card-body">
+                {% if devices %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Device ID</th>
+                                <th>User Name</th>
+                                <th>Status</th>
+                                <th>Registration Date</th>
+                                <th>Expiration Date</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for device in devices %}
+                            <tr>
+                                <td><code>{{ device.device_id }}</code></td>
+                                <td>{{ device.user_name }}</td>
+                                <td>
+                                    {% if device.approved %}
+                                        {% if device.expiration_date and device.expiration_date < today() %}
+                                        <span class="badge bg-danger">Expired</span>
+                                        {% else %}
+                                        <span class="badge bg-success">Approved</span>
+                                        {% endif %}
+                                    {% else %}
+                                    <span class="badge bg-warning">Pending</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ device.registration_date.strftime('%Y-%m-%d') if device.registration_date else 'N/A' }}</td>
+                                <td>
+                                    {% if device.expiration_date %}
+                                    {{ device.expiration_date.strftime('%Y-%m-%d') }}
+                                    {% else %}
+                                    <span class="text-muted">Not set</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="btn-group" role="group">
+                                        {% if not device.approved %}
+                                        <form method="POST" action="{{ url_for('device_action') }}" class="d-inline">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                            <input type="hidden" name="action" value="approve">
+                                            <input type="hidden" name="device_id" value="{{ device.device_id }}">
+                                            <button type="submit" class="btn btn-sm btn-success" 
+                                                    onclick="return confirm('Approve this device?')">
+                                                <i class="fas fa-check"></i> Approve
+                                            </button>
+                                        </form>
+                                        {% else %}
+                                        <form method="POST" action="{{ url_for('device_action') }}" class="d-inline">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                            <input type="hidden" name="action" value="deny">
+                                            <input type="hidden" name="device_id" value="{{ device.device_id }}">
+                                            <button type="submit" class="btn btn-sm btn-warning" 
+                                                    onclick="return confirm('Deny this device?')">
+                                                <i class="fas fa-times"></i> Deny
+                                            </button>
+                                        </form>
+                                        {% endif %}
+                                        
+                                        {% if device.approved %}
+                                        <button type="button" class="btn btn-sm btn-info" 
+                                                data-bs-toggle="modal" data-bs-target="#extendModal{{ device.id }}">
+                                            <i class="fas fa-calendar-plus"></i> Extend
+                                        </button>
+                                        {% endif %}
+                                        
+                                        <form method="POST" action="{{ url_for('device_action') }}" class="d-inline">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                            <input type="hidden" name="action" value="delete">
+                                            <input type="hidden" name="device_id" value="{{ device.device_id }}">
+                                            <button type="submit" class="btn btn-sm btn-danger" 
+                                                    onclick="return confirm('Delete this device permanently?')">
+                                                <i class="fas fa-trash"></i> Delete
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+
+                            <!-- Extension Modal -->
+                            {% if device.approved %}
+                            <div class="modal fade" id="extendModal{{ device.id }}" tabindex="-1">
+                                <div class="modal-dialog">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title">Extend Device: {{ device.device_id }}</h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                        </div>
+                                        <form method="POST" action="{{ url_for('device_action') }}">
+                                            <div class="modal-body">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                                <input type="hidden" name="action" value="extend">
+                                                <input type="hidden" name="device_id" value="{{ device.device_id }}">
+                                                <div class="mb-3">
+                                                    <label for="extension_days{{ device.id }}" class="form-label">Extension Days</label>
+                                                    <input type="number" class="form-control" 
+                                                           id="extension_days{{ device.id }}" name="extension_days" 
+                                                           value="30" min="1" max="365" required>
+                                                </div>
+                                                <div class="alert alert-info">
+                                                    <small>Current expiration: {{ device.expiration_date.strftime('%Y-%m-%d') if device.expiration_date else 'Not set' }}</small>
+                                                </div>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                                <button type="submit" class="btn btn-primary">Extend Device</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endif %}
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <i class="fas fa-mobile-alt fa-3x text-muted mb-3"></i>
+                    <h5>No devices found</h5>
+                    <p class="text-muted">No devices match your current filters.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
