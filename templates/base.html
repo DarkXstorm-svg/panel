@@ -149,17 +149,17 @@
     </div>
 
     <!-- Main Content -->
-    {% if session.user_id %}
-    <main class="main-content">
+    <main class="{% if session.user_id %}main-content{% else %}login-main{% endif %}">
+        {% if session.user_id %}
         <div class="content-wrapper">
-            {% block content %}{% endblock %}
-        </div>
-    </main>
-    {% else %}
-    <main class="login-main">
+        {% endif %}
+        
         {% block content %}{% endblock %}
+        
+        {% if session.user_id %}
+        </div>
+        {% endif %}
     </main>
-    {% endif %}
 
     <!-- Loading Overlay -->
     <div id="loadingOverlay" class="loading-overlay">
